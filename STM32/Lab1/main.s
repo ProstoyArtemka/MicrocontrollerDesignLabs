@@ -28,9 +28,9 @@ Cycle
 	MUL r6, r3, r4 ; R6 = i * 4
 	ADD r6, r2 ; R6 = (i * 4) + R2
 	
-	UDIV r7, r5, r6
+	UDIV r7, r5, r6 ; R7 = R6 / R6
 	
-	ADD r0, r7
+	ADD r0, r7 ; R0 = R0 + R7
 
 	BNE Cycle
 
