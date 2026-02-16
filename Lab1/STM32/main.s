@@ -11,27 +11,26 @@ Stack_Top
 	
 Start
 	
-	MOV r1, #5 ; R1 = ?
-	MOV r2, #10 ; R2 = ?
-	MOV r3, #6 ; R3 = Value i = 5 + 1
-	MOV r4, #4 ; R4 = Value 4 for multiplying
-	
-	
+	LDR r1, =-5 ; R1 = ?
+	LDR r2, =-4 ; R2 = ?
+	MOV r3, #1 ; R3 = Value i = 1
+	LDR r4, =4 ; R4 = Value 4 for multiplying
 	
 	MUL r5, r1, r1 ; R5 = R1 * R1
 	MUL r5, r1, r5 ; R5 = R1 * R1 * r1
 
+	MOV r0, #0
+
 Cycle
 
-	SUBS r3, #1 ; Decrement by 1
-
 	MUL r6, r3, r4 ; R6 = i * 4
-	ADD r6, r2 ; R6 = (i * 4) + R2
+	ADDS r6, r2 ; R6 = (i * 4) + R2
 	
-	UDIV r7, r5, r6 ; R7 = R6 / R6
-	
-	ADD r0, r7 ; R0 = R0 + R7
+	SDIVNE r7, r5, r6 ; if (r6 != 0) then R7 = R5 / R6
+	ADDNE r0, r7 ; if (r6 != 0) R0 = R0 + R7
 
+	ADD r3, #1 ; Increment I
+	CMP r3, #6 ; If r3 > 5, then done
 	BNE Cycle
 
 	NOP
