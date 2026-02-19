@@ -3,83 +3,157 @@
 	rjmp start
 
 start:
+	ldi r16, -10 ; Входное R1
+	ldi r17, -64 ; Входное R2
 
-	ldi r16, -5 ; R16 (R1) = ?
-	ldi r17, 3 ; R17 (R0) = ?
+	ldi r18, 5 ; I - 5
 
-	ldi r18, 5 ; Value of I
-	ldi r19, 4 ; For multiplying
+	; Возведение R1 в куб
+	
+	muls  r16, r16 ; r16^2
 
-	muls r16, r16 ; R16 * R16
-	mov r20, r0 ; R20 = R16 * R16
+	tst r16
+	brpl skip_negative
 
-	muls r20, r16 ; r20 = R16 * R16 * R16
-	mov r20, r0 ; R20 = R16 * R16 * R16 (low) 
-	mov r21, r1 ; R21 = R16 * R16 * R16 (high)
+	ldi r19, -1 ; Запоминаем что r16 было негативным
+	neg r16 ; Инвертируем r16
+
+skip_negative:
+
+	mov r20, r0 ; младший байт r16^2
+	mov r21, r1 ; старший байт r16^2
+
+	dec r16
+
+	breq cycle
+
+multiplication:
+	
+	add r0, r20 ; Добавить младший байт
+	adc r1, r21 ; Добавить старший байт и флаг C из предыдущей операции
+
+	dec r16
+	brne multiplication
+
+	; Конец возведения в степень
+
+	mov r20, r0 ; Переносим младший байт ответа
+	mov r21, r1 ; Переносим старший байт ответа
 
 cycle:
 
-	clr r27	
-	ldi r22, 16 ; Counter for division of both halves
+	clt ; Чистим регистр T (который отвечает за инверсию результата деления)
+	tst r19 ; Смотрим был ли куб отрицательным
 
-	mov r24, r20 ; R24 = R22 (low half of R16^3)
-	mov r25, r21 ; R25 = R21 (high half of R16^3)
+	brpl cube_was_positive ; Пропускаем установку флага если куб был положительным
 
-	muls r18, r19 ; R0 = i * 4
-	mov r26, r0 ; R26 = i * 4
+	set ; Ставим 1 в регистр T если куб всё таки был отрицательным
 
-	add r26, r17 ; R26 = r17 + (i * 4)
+cube_was_positive:
 
-	breq zero_skip ; if r17 + (i * 4) == 0, skip division 
+	clr r0
+	clr r1
 
-	clt; Clear negative number
+	; Считаем R2 + 4 * i
 
-	tst r25 ; Check sigh of high half
-	brpl divide_cycle ; If r25 > 0
+	ldi r30, 4 ; 4 для умножения
+	muls r18, r30 ; r0 = 4 * i
 
-	com r25 ; Invert high half
-	com r24 ; Invert low half
+	clr r30 ; 0 Для сложения ниже
+	tst r17 ; Проверяем r17 на отрицательность
 
-	subi r24, -1 ; r24 -= 1
-	sbci r25, -1 ; r25 -= 1 + C
+	brpl skip_to_addition ; Если r17 положительный, то пропускаем ужасы
 
-	set ; Remember negative number
+	ldi r30, 255 ; Подготоваливаем "инверсию" старшего байта
 
-divide_cycle:
+skip_to_addition:
 
-	lsl r24 ; shift bytes of low half to left, last byte now in carry
-	rol r25 ; get byte from carry and put it in right part of r25 (high half)
-	rol r27 ; get byte from carry and put in remainder
+	add r0, r17 ; r0 = (4 * i) + R2
+	adc r1, r30 ; r0:r1 = (4 * i) + R2
 
-	cp r27, r26 ; Compare remainder and divider
-	brlo divide_skip_sub ; If remainder < divider then sub divider from remainder
+	mov r2, r0 ; Переносим младший байт делителя во временный регистр, чтобы сделать операцию or и не испортить регистр r0 который ещё пригодится
 
-	sub r27, r26 ; Subtract divider from remainder
-	inc r24 ; Add 1 to divisible (low half)
+	or r2, r1 ; Если и r0 и r1 равны нулю, то и делитель равен 0
+	breq skip_division ; Если делитель равен нулю, то делить не круто
 
-divide_skip_sub:
+	tst r1 ; Проверка делителя на отрицательность
+	brpl skip_div_inversion ; Если делитель положительный то идём дальше
 
-	dec r22 ; Divide counter--
-	brne divide_cycle
+	tst r19 ; Проверяем регистр который запоминает отрицательное ли делимое
+	brmi clear_t ; Если и делимое и делитель отрицательные, то можно просто инвертировать делитель и очистить регистр T
+	; Если только делитель отрицательный, инвертируем делитель и ставим T
 
-	brtc skip_invert
+	set ; Ставим T
 
-	com r24 ; Invert low half
-	com r25 ; Invert high half
-	subi r24, -1 ; Sub 1 after inversion
-	sbci r25, -1 ; Sub 1 with carry after inversion
+	rjmp divider_inversion ; Прыгаем на инверсию делителя
 
-skip_invert:
+clear_t:
 
-	add r28, r24 ; R28 = R28 + R24
-	adc r29, r25 ; R29 = R29 + R25 + C
+	clt ; Очищаем T
 
-zero_skip:
+divider_inversion:
+
+	com r0 ; Инвертируем делитель (младший байт)
+	com r1 ; Инвертируем делитель (страший байт)
+
+	ldi r30, 1 ; 1 для сложения
+	add r0, r30 ; Добавляем 1, так как после инвертирования  
+
+	ldi r30, 0 ; 0 для сложения
+	adc r1, r30 ; Добавляем C, если при прошлом сложении мы вышли за 8 бит
+
+skip_div_inversion:
+
+	mov r22, r0 ; Младший байт делителя
+	mov r23, r1 ; Старший байт делителя
+
+	; Деление 
+
+	mov r24, r20 ; Копируем R1^3 для деления (младший байт)
+	mov r25, r21 ; Копируем R1^3 для деления (старший байт)
+
+	clr r26
+	clr r27
+
+division:
 	
-	dec r18 ; I--
-	brne cycle
+	cp r24, r22 ; Сравниваем младший байт делимого и делителя (Эта инструкция ещё и устанавливает бит C, так что его можно применять дальше)
+	cpc r25, r23 ; Сравнениваем страший байт делимого и делителя (Вместе с битом C, тооооооесть результат будет считаться как r21 - r25 - C)
 
-	mov r0, r28 ; r0 = 28
-	mov r1, r29 ; r1 = 29
+	brcs result_division ; Если делимое меньше делителя, то можно прыгнуть к результату
 
-	rjmp start
+	sub r24, r22 ; Отнимаем делитель их делимого (младший байт)
+	sbc r25, r23 ; Отнимаем делитель из делимого (старший байт и C)
+
+	adiw r26, 1 ; Увеличиваем ответ на 1
+
+	rjmp division
+
+result_division:
+	
+	brtc skip_division_inversion ; Если флаг инверсии не стоит, то пропускаем инверсию слагаемого 
+	
+	com r26 ; Инвертируем результат (младший байт)
+	com r27 ; Инвертируем результат (страший байт)
+
+	ldi r30, 1 ; 1 для сложения
+	clr r2 ; 0 для сложения
+
+	add r26, r30 ; Добавляем 1 к младшему байту из-за инверсии
+	adc r27, r2 ; Добавляем C если вышли за 8 бит
+
+skip_division_inversion:
+
+	add r28, r26 ; Складываем результат деления к r28:r29 (младший байт)
+	adc r29, r27 ; Складываем результат деления к r28:r29 (старший байт)
+
+skip_division:
+	
+	dec r18
+
+	clr r30 ; 0 для сравнения
+	cp r18, r30 ; Сравниваем I и 1
+
+	brne cycle ; Если I != 1 то продолжаем
+
+	nop
