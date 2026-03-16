@@ -1,20 +1,17 @@
 import math
+import random
 
-r0 = -10
-r1 = -5
-r2 = 25
+r19_18 = 31808
+r1_0 = -18182
+r2 = 49
 
-result = 0
+print(f"Input: r19:r18 = {r19_18}, r1:r0 = {r1_0}, r2 = {r2}")
 
-for k in range(8):
-    subtract = r0 - math.pow(r1, k)
+up = r19_18 - (3 * r1_0)
+bot = 2 + abs(r2)
 
-    sum = math.sqrt(abs(2.56 + (r2 * k)))
+print(f"Up: {up}")
+print(f"Bot: {bot}")
 
-    if (sum == 0): continue
-
-    result += subtract / sum
-
-    print(f"Iter {k} = {subtract / sum}")
-
-print(f"Result: {result}")
+if (bot != 0): 
+    print(f"Result: {round(up / bot, 2)}")
